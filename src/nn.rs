@@ -1,21 +1,21 @@
 use rand::Rng;
 
 #[derive(Debug)]
-struct Neuron {
+pub struct Neuron {
     value_a: f32,
     unscaled_z: f32,
     error_z: f32,
-    bias_b: f32,
+    pub bias_b: f32,
     gradient_b: f32
 }
 
 #[derive(Debug)]
-struct Connection {
-    value_w: f32,
+pub struct Connection {
+    pub value_w: f32,
     gradient_w: f32,
 }
 
-type Layer = Vec<Neuron>;
+pub type Layer = Vec<Neuron>;
 pub type Input = Vec<f32>;
 pub type Output = Vec<f32>;
 pub struct Sample {
@@ -69,8 +69,8 @@ fn new_connections(current: &Layer, previous: &Layer) -> Connections {
 
 #[derive(Debug)]
 pub struct NN {
-    layers: Vec<Layer>,
-    connections: Vec<Connections>
+    pub layers: Vec<Layer>,
+    pub connections: Vec<Connections>
 }
 
 impl NN {
@@ -139,6 +139,20 @@ impl NN {
         }
     }
 
+    pub fn get(&mut self, input: &Input) -> Output {
+        self.forward(input);
+
+        let layer = &self.layers[self.layers.len() -1];
+
+        let mut out = Vec::with_capacity(layer.len());
+
+        for value in layer.iter() {
+            out.push(value.value_a)
+        };
+
+        out
+    }
+
     fn backpropagete(&mut self, output: &Output) {
         // set last layer error
         let layers_len = self.layers.len();
@@ -147,6 +161,7 @@ impl NN {
         for i in 0..last_layer.len() {
             let neuron = &mut last_layer[i];
 
+            // TODO: Why nuron.value_a - output[i] and not vice versa?
             neuron.error_z =  (neuron.value_a - output[i]) * activate_sigmoid_derivate(neuron.unscaled_z)
         }
 
@@ -224,7 +239,7 @@ impl NN {
         }
     }
 
-    pub fn train_samples(&mut self, samples: &Samples, rate: f32) {
+    pub fn train_samples(&mut self, samples: &[Sample], rate: f32) {
         self.clear_gradient();
     
         samples.iter().for_each(|sample| {
