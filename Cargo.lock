@@ -327,7 +327,7 @@ dependencies = [
  "image",
  "once_cell",
  "rand",
- "sdl2",
+ "tekenen",
 ]
 
 [[package]]
@@ -553,6 +553,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "tekenen"
+version = "0.1.0"
+dependencies = [
+ "sdl2",
 ]
 
 [[package]]
