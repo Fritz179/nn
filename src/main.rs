@@ -1,30 +1,28 @@
-use image::{io::Reader as ImageReader, GenericImageView};
+mod preloaded;
 
-fn read_image(path: &str) -> Samples {
-    let img = ImageReader::open(path).unwrap().decode().unwrap();
-
-    assert_eq!(img.width(), 28);
-    assert_eq!(img.height(), 28);
+fn tekenen_to_sample(image: &Tekenen, value: f32) -> Samples {
+    assert_eq!(image.width(), 28);
+    assert_eq!(image.height(), 28);
 
     let mut samples = Vec::with_capacity(28*28);
 
     for x in 0..28 {
         for y in 0..28 {
-            let color = img.get_pixel(x, y);
-            samples.push(Sample { input: vec![x as f32 / 28.0, y as f32 / 28.0], output: vec![color[0] as f32 / 255.0] })
+            let color = image.get_pixel(x, y).unwrap();
+            samples.push(Sample { input: vec![x as f32 / 28.0, y as f32 / 28.0, value], output: vec![color[0] as f32 / 255.0] })
         }
     };
 
     samples
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 mod nn;
 use nn::{NN, Sample, Samples};
 
 use rand::seq::SliceRandom;
-use tekenen::{Platform, PlatformTrait, IntervalDecision, Event, Tekenen, COLORS};
+use tekenen::{Platform, PlatformTrait, IntervalDecision, Event, Tekenen, colors, ui::*};
+
+use crate::preloaded::load_preloaded;
 
 fn main() {
     let and_data = vec![
@@ -48,13 +46,16 @@ fn main() {
         Sample { input: vec![1.0, 1.0], output: vec![0.0] },
     ];
 
-    let arch = [2, 8, 8, 8, 8, 1];
+    let arch = [3, 8, 8, 1];
     let mut nn = NN::new(&arch);
 
-    let img8 = read_image("./src/mnist/8.png");
-    let img1 = read_image("./src/mnist/1.png");
+    let preloaded = load_preloaded();
+    let img1 = tekenen_to_sample(&preloaded.img1, 0.0);
+    let mut img8 = tekenen_to_sample(&preloaded.img8, 1.0);
 
-    let mut training_data = img8;
+    let mut training_data = img1;
+    training_data.append(&mut img8);
+
     let mut training_iterations = 0;
 
 
@@ -65,6 +66,8 @@ fn main() {
 
     let mut rate = 0.1;
     let mut graph = vec![];
+
+    let mut scroller = widgets::Scroller::new(50, 250, 500);
 
     Platform::set_interval(move || {
 
@@ -83,12 +86,21 @@ fn main() {
                     }
                     println!("{char}")
                 },
+                Event::MouseDown { x, y } => {
+                    scroller.mouse_down(x, y);
+                },
+                Event::MouseMove { x, y } => {
+                    scroller.mouse_move(x, y);
+                },
+                Event::MouseUp { x, y } => {
+                    scroller.mouse_up(x, y);
+                },
                 _ => { }
             }
         }
 
         // draw operations
-        tekenen.background(COLORS::GRAY);
+        tekenen.background(colors::GRAY);
 
         let score = nn.score(&training_data);
         graph.push(score);
@@ -115,31 +127,23 @@ fn main() {
 
         // draw original image
         let scale = 5;
-        for sample in &training_data {
-            let x = sample.input[0] * 28.0;
-            let y = sample.input[1] * 28.0;
-            let mut c = sample.output[0];
+        tekenen.draw_scaled_image(0, 0, &preloaded.img1, scale);
 
-            if c < 0.0 { c = 0.0 }
-            if c > 1.0 { c = 1.0 }
-
-            let c = (c * 255.0) as u8;
-
-            tekenen.rect(x as i32 * scale, y as i32 * scale, scale, scale, [c, c, c, 255]);
-        }
+        let scale = 5;
+        tekenen.draw_scaled_image(29 * scale, 0, &preloaded.img8, scale);
 
         // draw nn image
         let size = 28 * scale;
         for x in 0..size {
             for y in 0..size {
-                let mut c = nn.get(&vec![x as f32 / size as f32, y as f32 / size as f32])[0];
+                let mut c = nn.get(&vec![x as f32 / size as f32, y as f32 / size as f32, scroller.value])[0];
 
                 if c < 0.0 { c = 0.0 }
                 if c > 1.0 { c = 1.0 }
 
                 let c = (c * 255.0) as u8;
 
-                tekenen.set_pixel(x as i32 + scale * 29, y as i32, [c, c, c, 255]);
+                tekenen.set_pixel(x as i32 + scale * 58, y as i32, [c, c, c, 255]);
             }
         }
 
@@ -183,11 +187,14 @@ fn main() {
             }
         }
 
+        // Draw scroller
+        scroller.display(&mut tekenen);
+
         // draw graph
         let x1 = 450;
         let y1 = 50;
         let size = 300;
-        tekenen.rect(x1, y1, size, size, COLORS::WHITE);
+        tekenen.rect(x1, y1, size, size, colors::WHITE);
 
         let step = size as f32 / graph.len() as f32;
         let mut x = x1 as f32;
@@ -195,10 +202,12 @@ fn main() {
         let mut py = y1;
 
         for i in 0..graph.len() {
-            let y = y1 + size - (graph[i] * size as f32) as i32;
+            let max = graph[0];
+
+            let y = y1 + size - ((graph[i] / max) * size as f32) as i32;
 
             x += step;
-            tekenen.line(px, py, x as i32, y, COLORS::RED);
+            tekenen.line(px, py, x as i32, y, colors::RED);
             px = x as i32;
             py = y;
         }
@@ -209,5 +218,5 @@ fn main() {
         window.display_pixels(tekenen.get_pixels());
 
         IntervalDecision::Repeat
-    }, 10)
+    }, 24)
 }
