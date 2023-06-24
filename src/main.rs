@@ -17,6 +17,8 @@ fn tekenen_to_sample(image: &Tekenen, value: f32) -> Samples {
 }
 
 mod nn;
+use std::time::Instant;
+
 use nn::{NN, Sample, Samples};
 
 use rand::seq::SliceRandom;
@@ -46,20 +48,20 @@ fn main() {
         Sample { input: vec![1.0, 1.0], output: vec![0.0] },
     ];
 
-    let arch = [3, 8, 8, 1];
+    let arch = [3, 18, 13, 9, 1];
     let mut nn = NN::new(&arch);
 
     let preloaded = load_preloaded();
-    let img1 = tekenen_to_sample(&preloaded.img1, 0.0);
-    let mut img8 = tekenen_to_sample(&preloaded.img8, 1.0);
+    let mut training_data = Vec::new();
 
-    let mut training_data = img1;
-    training_data.append(&mut img8);
+    for i in 0..=9 {
+        training_data.append(&mut tekenen_to_sample(&preloaded[i], i as f32 - 4.5))
+    }
 
     let mut training_iterations = 0;
 
 
-    println!("All initialized!, arch: {:?}", arch);
+    println!("All initialized!, arch: {:?}, training samples: {}", arch, training_data.len());
 
     let mut window = Platform::new(800, 600).unwrap();
     let mut tekenen = Tekenen::new(800, 600);
@@ -68,6 +70,10 @@ fn main() {
     let mut graph = vec![];
 
     let mut scroller = widgets::Scroller::new(50, 250, 500);
+    scroller.min = -5.0;
+    scroller.max = 5.0;
+
+    let mut start = Instant::now();
 
     Platform::set_interval(move || {
 
@@ -104,9 +110,15 @@ fn main() {
 
         let score = nn.score(&training_data);
         graph.push(score);
+
+        let running = Instant::now() - start;
+
         tekenen.draw_text(&format!("Score: {}", score), 450, 450);
         tekenen.draw_text(&format!("Iteration: {}", training_iterations), 450, 475);
         tekenen.draw_text(&format!("Rate: {rate}"), 450, 500);
+        tekenen.draw_text(&format!("Elapsed: {}", running.as_secs()), 450, 525);
+        tekenen.draw_text(&format!("Slider: {}", scroller.value), 450, 550);
+        tekenen.draw_text(&format!("Arch: {:?}", arch), 450, 575);
 
 
         let mut rng = rand::thread_rng();
@@ -126,13 +138,12 @@ fn main() {
         }
 
         // draw original image
-        let scale = 5;
-        tekenen.draw_scaled_image(0, 0, &preloaded.img1, scale);
-
-        let scale = 5;
-        tekenen.draw_scaled_image(29 * scale, 0, &preloaded.img8, scale);
+        for i in 0..=9 {
+            tekenen.draw_image(29 * i, 0, &preloaded[i as usize]);
+        }
 
         // draw nn image
+        let scale = 5;
         let size = 28 * scale;
         for x in 0..size {
             for y in 0..size {
@@ -212,11 +223,8 @@ fn main() {
             py = y;
         }
 
-        let remaining = format!("Reamining time: {:?}", Platform::get_remaining_time());
-        tekenen.draw_text(&remaining, 450, 525);
-
         window.display_pixels(tekenen.get_pixels());
 
         IntervalDecision::Repeat
-    }, 24)
+    }, 10)
 }
