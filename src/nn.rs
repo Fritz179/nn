@@ -1,11 +1,12 @@
-use std::{cell::RefCell, borrow::BorrowMut, ops::{Mul, AddAssign}};
+use std::{cell::RefCell, borrow::BorrowMut};
+use serde::{Serialize, Deserialize};
 
 use rand::Rng;
-use ndarray::{arr2, arr1, Array1, Array2, Array, Axis};
+use ndarray::{arr1, Array1, Array2, Array};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Layer {
-    value_a: RefCell<Array1<f32>>,
+    pub value_a: RefCell<Array1<f32>>,
     unscaled_z: RefCell<Array1<f32>>,
     error_z: RefCell<Array1<f32>>,
     pub bias_b: RefCell<Array1<f32>>,
@@ -13,19 +14,39 @@ pub struct Layer {
 }
 
 impl Layer {
+    pub fn new(size: usize) -> Self {
+        let mut rng = rand::thread_rng();
+        
+        let layer = Self {
+            value_a: RefCell::new(new_vec(size)),
+            unscaled_z: RefCell::new(new_vec(size)),
+            error_z: RefCell::new(new_vec(size)),
+            bias_b: RefCell::new(new_vec(size)),
+            gradient_b: RefCell::new(new_vec(size)),
+        };
+    
+        // Init each neuron with a random bias
+        let mut bias = layer.bias_b.borrow_mut();
+        for i in 0..size  {
+            bias[i] = rng.gen_range(-1.0..1.0);
+        }
+    
+        drop(bias);
+    
+        layer
+    }
+
     pub fn len(&self) -> usize {
         self.value_a.borrow().len()
     }
 }
 
-pub type Input = Vec<f32>;
+pub type Input = Layer;
 pub type Output = Vec<f32>;
 pub struct Sample {
     pub input: Input,
     pub output: Output,
 }
-
-pub type Samples = Vec<Sample>;
 
 fn new_vec(size: usize) -> Array1<f32> {
     let mut vec = Vec::with_capacity(size);
@@ -37,30 +58,7 @@ fn new_vec(size: usize) -> Array1<f32> {
     arr1(&vec)
 }
 
-
-fn new_layer(size: usize) -> Layer {
-    let mut rng = rand::thread_rng();
-    
-    let layer = Layer {
-        value_a: RefCell::new(new_vec(size)),
-        unscaled_z: RefCell::new(new_vec(size)),
-        error_z: RefCell::new(new_vec(size)),
-        bias_b: RefCell::new(new_vec(size)),
-        gradient_b: RefCell::new(new_vec(size)),
-    };
-
-    // Init each neuron with a random bias
-    let mut bias = layer.bias_b.borrow_mut();
-    for i in 0..size  {
-        bias[i] = rng.gen_range(-1.0..1.0);
-    }
-
-    drop(bias);
-
-    layer
-}
-
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Connections {
     pub value_w: Array2<f32>,
     gradient_w: Array2<f32>,
@@ -85,7 +83,8 @@ fn new_connections(current: &Layer, previous: &Layer) -> Connections {
     }
 }
 
-#[derive(Debug)]
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct NN {
     pub layers: Vec<Layer>,
     pub connections: Vec<Connections>
@@ -100,7 +99,7 @@ impl NN {
         let mut layers = Vec::with_capacity(arch.len());
 
         for layer in 0..arch.len() {
-            layers.push(new_layer(arch[layer]))
+            layers.push(Layer::new(arch[layer]))
         }
 
 
@@ -119,51 +118,6 @@ impl NN {
         })
     }
 
-    // let out = io[0] as f32 * nn.wa + io[1] as f32 * nn.wb + nn.b;
-    // fn forward_old(&mut self, input: &Input) {
-
-    //     let layer0 = self.layers[0].borrow_mut();
-
-    //     // layer 0 is input
-    //     assert_eq!(input.len(), layer0.len(), "Input layers not of same size!");
-
-    //     // could probably swap layer 1 for input layer?
-    //     let mut value_a = layer0.value_a.borrow_mut();
-    //     for i in 0..input.len() {
-    //         value_a[i] = input[i]
-    //     }
-
-    //     drop(value_a);
-
-    //     // calculate value for each successive layer
-    //     for curr_layer_i in 1..self.layers.len() {
-
-    //         let connection = &self.connections[curr_layer_i - 1];
-
-    //         let mut curr_unscaled_z = self.layers[curr_layer_i].unscaled_z.borrow_mut();
-    //         let mut curr_value_a = self.layers[curr_layer_i].value_a.borrow_mut();
-
-
-    //         let prev_bias_b = self.layers[curr_layer_i - 1].bias_b.borrow();
-    //         let prev_value_a = self.layers[curr_layer_i - 1].value_a.borrow();
-
-    //         for curr_node_i in 0..curr_value_a.len() {
-
-    //             // add the bias
-    //             let mut unscaled_z = prev_bias_b[curr_node_i];
-        
-    //             // add all weights
-    //             for prev_node_i in 0..prev_value_a.len() {
-    //                 unscaled_z += prev_value_a[prev_node_i] * connection.value_w[(curr_node_i, prev_node_i)];
-    //             }
-        
-    //             // activation function
-    //             curr_unscaled_z[curr_node_i] = unscaled_z;
-    //             curr_value_a[curr_node_i] = activate_sigmoid(unscaled_z);
-    //         }
-    //     }
-    // }
-
     fn forward(&mut self, input: &Input) {
 
         let mut layer0_value_a = self.layers[0].value_a.borrow_mut();
@@ -172,6 +126,8 @@ impl NN {
         assert_eq!(input.len(), layer0_value_a.len(), "Input layers not of same size!");
 
         // could probably swap layer 1 for input layer?
+
+        let input = input.value_a.borrow();
         for i in 0..input.len() {
             layer0_value_a[i] = input[i]
         }
@@ -218,52 +174,6 @@ impl NN {
 
         out
     }
-
-    // fn backpropagete_old(&mut self, output: &Output) {
-    //     let layers_len = self.layers.len();
-
-    //     {
-    //         // set last layer error
-    //         let last_layer = &mut self.layers[layers_len - 1].borrow_mut();
-
-    //         for i in 0..last_layer.len() {
-    //             // TODO: Why nuron.value_a - output[i] and not vice versa?
-    //             last_layer.error_z[i] =  (last_layer.value_a[i] - output[i]) * activate_sigmoid_derivate(last_layer.unscaled_z[i])
-    //         }
-    //     }
-
-
-    //     // loop for each previous layer
-    //     for curr_layer_i in (1..layers_len).rev() {
-    //         let mut curr_layer = self.layers[curr_layer_i].borrow_mut();
-    //         let mut prev_layer = self.layers[curr_layer_i - 1].borrow_mut();
-    //         let connection = self.connections[curr_layer_i - 1].borrow_mut();
-
-    //         for curr_node_i in 0..curr_layer.len() {
-
-    //             for prev_node_i in 0..prev_layer.len() {
-    //                 // update connetions
-
-    //                 connection.gradient_w[(curr_node_i, prev_node_i)] += curr_layer.error_z[curr_node_i] * prev_layer.value_a[prev_node_i];
-    //             } 
-
-    //             // update bias
-    //             curr_layer.gradient_b[curr_node_i] += curr_layer.error_z[curr_node_i];
-    //         }
-
-    //         // update previous error
-    //         // TODO: Not needed for first layer?
-    //         for prev_node_i in 0..prev_layer.len() {
-    //             let mut total = 0.0;
-
-    //             for curr_node_i in 0..curr_layer.len() {
-    //                 total += curr_layer.error_z[curr_node_i] * connection.value_w[(curr_node_i, prev_node_i)]
-    //             }
-
-    //             prev_layer.error_z[prev_node_i] = total * activate_sigmoid_derivate(prev_layer.unscaled_z[prev_node_i])
-    //         }
-    //     }   
-    // }
 
     fn backpropagete(&mut self, output: &Output) {
         let layers_len = self.layers.len();
@@ -410,7 +320,7 @@ impl NN {
         total / sample.output.len() as f32 / 2.0
     }
     
-    pub fn score(&mut self, samples: &Samples) -> f32 {
+    pub fn score(&mut self, samples: &[Sample]) -> f32 {
         let mut total = 0.0;
     
         samples.iter().for_each(|sample| {
@@ -426,8 +336,11 @@ enum ActivationFunction {
     Sigmoid
 }
 
-// const ACTIVATION_FUNCTION: ActivationFunction = ActivationFunction::Linear(0.0);
-// const ACTIVATION_FUNCTION: ActivationFunction = ActivationFunction::Linear(0.01);
+// TODO: 
+// Is ReLU bad because bias and weights are inittialised from -1 to 1? Is 0 to 1 better?
+
+// const ACTIVATION_FUNCTION: ActivationFunction = ActivationFunction::Linear(0.0); // ReLU
+// const ACTIVATION_FUNCTION: ActivationFunction = ActivationFunction::Linear(0.01);   // Leaky ReLU
 const ACTIVATION_FUNCTION: ActivationFunction = ActivationFunction::Sigmoid;
 
 fn activation_function(value: f32) -> f32 {

@@ -17,7 +17,7 @@ fn tekenen_to_sample(image: &Tekenen, value: f32) -> Samples {
 }
 
 mod nn;
-use std::{time::Instant, process::Command, fmt::format};
+use std::{time::Instant, process::Command};
 
 use nn::{NN, Sample, Samples};
 
@@ -28,7 +28,7 @@ use preloaded::load_preloaded;
 
 use image;
 
-static mut id: i32 = 0;
+static mut ID: i32 = 0;
 
 fn save_frame(nn: &mut Box<NN>, at: f32, path: &str) {
     let scale = 20;
@@ -65,8 +65,8 @@ fn save(nn: &mut Box<NN>, at: f32, num: f32) {
     let att = format!("{num}").replace(".", "_");
 
     let this_id = unsafe {
-        id += 1;
-        id - 1
+        ID += 1;
+        ID - 1
     };
 
     let path = format!("nn_image_at_{att}_{}_{}.png", this_id, rng.gen_range(0..999));
@@ -76,8 +76,8 @@ fn save(nn: &mut Box<NN>, at: f32, num: f32) {
 
 fn save_video(nn: &mut Box<NN>) {
     let this_id = unsafe {
-        id += 1;
-        id - 1
+        ID += 1;
+        ID - 1
     };
 
     let images = 500;
