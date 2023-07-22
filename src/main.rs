@@ -5,6 +5,7 @@ mod preloaded;
 
 use rand::seq::SliceRandom;
 use tekenen::*;
+use platform::*;
 
 mod nn;
 use nn::{Input, Sample};
@@ -198,6 +199,8 @@ fn main () {
     let mut drawing_sample_canvas = Tekenen::new(28, 28);
     let mut drawing_sample = load_data(&drawing_sample_canvas, 0);
 
+    let mut shuffled_until = usize::MAX;
+
     for i in 0..=9 {
         drawing_sample.output[i] = i as f32;
     }
@@ -265,10 +268,13 @@ fn main () {
 
         let batch_size = batch_slider.value as usize;
         'out: while !Platform::get_remaining_time().is_zero() && running {
-            training_data.shuffle(&mut rng);
+            if shuffled_until >= training_data.len() - batch_size {
+                shuffled_until = 0;
+                training_data.shuffle(&mut rng);
+            }
 
-            for i in 0..(training_data.len() / batch_size) {
-                let start = i * batch_size;
+            while shuffled_until + batch_size < training_data.len() {
+                let start = shuffled_until;
                 let end = start + batch_size;
     
                 nn.train_samples(&training_data[start..end], learning_rate);
@@ -279,10 +285,6 @@ fn main () {
                     break 'out
                 }
             }
-
-            if training_iterations % 1000 == 0 {
-                println!("{}", running_time.as_millis())
-            }
         }
 
         // Draw
@@ -290,7 +292,7 @@ fn main () {
         batch_slider.display(&mut tekenen);
 
         // Print info
-        let score = nn.score(&testing_data[0..1000]);
+        let score = nn.score(&testing_data[0..200]);
         graph_data.push(score);
 
         let infos = [

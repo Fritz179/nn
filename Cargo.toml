@@ -12,7 +12,9 @@ ndarray = { version = "0.15.6", features = ["serde"] }
 image = "0.24.6"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
-tekenen = {path = "../tekenen/tekenen"}
+
+# tekenen = {path = "../tekenen/tekenen"}
+tekenen = "0.0.1"
 
 [build-dependencies]
 preloader = { path = "../tekenen/preloader" }

@@ -22,7 +22,7 @@ use std::{time::Instant, process::Command};
 use nn::{NN, Sample, Samples};
 
 use rand::{seq::SliceRandom, Rng};
-use tekenen::{Platform, PlatformTrait, IntervalDecision, Event, Tekenen, colors, ui::*};
+use tekenen::{platform::{Platform, PlatformTrait, IntervalDecision, Event}, Tekenen, colors, ui::*};
 
 use preloaded::load_preloaded;
 

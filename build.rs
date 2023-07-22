@@ -16,7 +16,7 @@ fn read_imgs(path: &str) -> Result<Preloaded, std::io::Error> {
 
             current.push(preload_image(file.path().to_str().unwrap()));
 
-            if current.len() > 15 {
+            if current.len() > 5 {
                 break
             }
         }
